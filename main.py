@@ -54,8 +54,8 @@ class Importer(object):
         print(command_id)
 
     def error_sample(self):
-        print('test.py -i <inputfile> -c <pg_url>')
-        print('test.py -i "/tmp/demo.csv" -c "postgresql://postgres:postgres@localhost:5432/test"')
+        print('test.py -i <inputfile> -c <pg_url> -u <user> -p <path>')
+        print('test.py -i "/tmp/demo.csv" -c "postgresql://postgres:postgres@localhost:5432/test" -c "yop" -p "/"')
         sys.exit(2)
 
     def is_connected(self):
