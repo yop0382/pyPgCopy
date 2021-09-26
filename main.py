@@ -1,7 +1,11 @@
+from typing import Optional, Any, Iterator, Dict
+
 import psycopg2
 import getopt
 import sys
 import urllib.parse
+import csv
+import StringIteratorIO
 
 conn = None
 pg_connect_string = None
@@ -45,7 +49,9 @@ class Importer(object):
         self.user = t_user
 
         command_id = self.create_command()
-        self.copy_insert(command_id)
+        # self.copy_insert(command_id)
+        self.copy_string_iterator(self.read_csv(), command_id)
+        print(command_id)
 
     def error_sample(self):
         print('test.py -i <inputfile> -c <pg_url>')
@@ -82,6 +88,33 @@ class Importer(object):
         cur.execute(sql, (self.user, self.path))
         last_id = cur.fetchone()[0]
         return last_id
+
+    def clean_csv_value(self, value: Optional[Any]) -> str:
+        if value is None:
+            return r'\N'
+        return str(value).replace('\n', '\\n')
+
+    def create_staging_table(self, cursor) -> None:
+        cursor.execute("""
+            DROP TABLE IF EXISTS tmp_c;
+            CREATE TEMP TABLE tmp_c (command_id int, session_id TEXT, status TEXT);
+        """)
+
+    def read_csv(self):
+        return csv.DictReader(open(self.input_file, encoding='utf-8-sig'))
+
+    def copy_string_iterator(self, csvs: Iterator[Dict[str, Any]], command_id) -> None:
+        with self.conn.cursor() as cursor:
+            self.create_staging_table(cursor)
+            events_string_iterator = StringIteratorIO.StringIteratorIO((
+                '|'.join(map(self.clean_csv_value, (
+                    command_id,
+                    csv["session_id"],
+                    "unknown"
+                ))) + '\n'
+                for csv in csvs
+            ))
+            cursor.copy_from(events_string_iterator, 'events', sep='|', columns=['command_id', 'session_id', 'status'])
 
     def copy_insert(self, command_id):
         self.is_connected()
